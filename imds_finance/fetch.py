@@ -66,9 +66,23 @@ def _em_statements(code):
     return profit, balance, cash
 
 def _yf_frames(code):
+    # Yahoo 对数据中心 IP 限流较凶：1s 起步间隔；命中限流再等 20s 重试一次，
+    # 仍失败则抛出交给 fetch_series 降级为 []。
+    import time
     import yfinance as yf
-    t = yf.Ticker(code)
-    return t.quarterly_financials, t.quarterly_balance_sheet, t.quarterly_cashflow
+    time.sleep(1.0)
+    for attempt in (0, 1):
+        try:
+            t = yf.Ticker(code)
+            return t.quarterly_financials, t.quarterly_balance_sheet, t.quarterly_cashflow
+        except Exception as e:
+            msg = str(e)
+            retryable = "Rate limit" in msg or "Too Many Requests" in msg \
+                or type(e).__name__ == "YFRateLimitError"
+            if attempt == 0 and retryable:
+                time.sleep(20)
+                continue
+            raise
 
 def _period_str(raw):
     return str(raw)[:10]

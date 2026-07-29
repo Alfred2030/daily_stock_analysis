@@ -1,6 +1,7 @@
 import pytest
 import screener.snapshot as snap
-from screener.snapshot import SnapshotError, _fetch_snapshot_direct, fetch_snapshot
+from screener.snapshot import (SnapshotError, _fetch_snapshot_direct,
+                               _us_klines_tencent, fetch_klines, fetch_snapshot)
 
 
 def test_fetch_snapshot_direct_paginates_and_normalizes(monkeypatch):
@@ -100,3 +101,41 @@ def test_fetch_snapshot_raises_when_both_fail(monkeypatch):
 
     with pytest.raises(SnapshotError):
         fetch_snapshot("a")
+
+
+def _tx_payload(key, n=70):
+    day = [[f"2026-04-{i%28+1:02d}", str(100.0 + i), str(101.0 + i),
+            str(103.0 + i), str(99.0 + i), str(1000 + i)] for i in range(n)]
+    return {"code": 0, "data": {key: {"day": day}}}
+
+
+def test_us_klines_tencent_maps_fields(monkeypatch):
+    monkeypatch.setattr(snap, "_tx_kline_page",
+                        lambda param: _tx_payload("usABG.N"))
+    rows = _us_klines_tencent("ABG", "106.ABG", days=60)
+    assert len(rows) == 60
+    # 腾讯行格式 [date, open, close, high, low, volume] → close=x[2]
+    assert rows[-1]["close"] == 170.0 and rows[-1]["high"] == 172.0
+    assert rows[-1]["low"] == 168.0 and rows[-1]["volume"] == 1069.0
+
+
+def test_us_klines_tencent_suffix_retry(monkeypatch):
+    def fake_page(param):
+        key = param.split(",", 1)[0]
+        if key == "usXYZ.OQ":
+            return _tx_payload("usXYZ.OQ", n=30)
+        return {"code": 0, "data": {key: {"day": []}}}
+    monkeypatch.setattr(snap, "_tx_kline_page", fake_page)
+    rows = _us_klines_tencent("XYZ", "106.XYZ", days=20)   # 前缀映射.N拿不到→轮试.OQ
+    assert len(rows) == 20
+
+
+def test_fetch_klines_us_falls_back_to_tencent(monkeypatch):
+    class FakeAk:
+        def stock_us_hist(self, **kw):
+            raise RuntimeError("RemoteDisconnected")
+    monkeypatch.setitem(__import__("sys").modules, "akshare", FakeAk())
+    monkeypatch.setattr(snap, "_tx_kline_page",
+                        lambda param: _tx_payload("usABG.N"))
+    rows = fetch_klines("ABG", "us", days=60, secid="106.ABG")
+    assert len(rows) == 60 and rows[0]["close"] is not None

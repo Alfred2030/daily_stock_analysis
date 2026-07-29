@@ -98,20 +98,60 @@ def fetch_listing_days_a(codes):
         time.sleep(0.3)             # 限流保护
     return out
 
+_TX_SUFFIX = {"105": ".OQ", "106": ".N", "107": ".A"}
+
+def _tx_kline_page(param):
+    import requests
+    r = requests.get("https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
+                     params={"param": param},
+                     headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+    r.raise_for_status()
+    return r.json()
+
+def _us_klines_tencent(code, secid, days=60):
+    """腾讯美股日K兜底。secid 形如 105.AAPL；后缀映射失败时轮试其余后缀。"""
+    prefix = (secid or "").split(".", 1)[0]
+    suffixes = [_TX_SUFFIX.get(prefix)] if _TX_SUFFIX.get(prefix) else []
+    suffixes += [s for s in (".OQ", ".N", ".A") if s not in suffixes]
+    for suf in suffixes:
+        key = f"us{code}{suf}"
+        try:
+            d = _tx_kline_page(f"{key},day,,,{days + 6},qfq")
+            rows = (((d.get("data") or {}).get(key) or {}).get("qfqday")
+                    or ((d.get("data") or {}).get(key) or {}).get("day") or [])
+            if rows:
+                out = []
+                for x in rows[-days:]:
+                    # [date, open, close, high, low, volume]
+                    out.append({"close": to_float(x[2]), "high": to_float(x[3]),
+                                "low": to_float(x[4]), "volume": to_float(x[5])})
+                return out
+        except Exception:
+            continue
+    return []
+
 def fetch_klines(code, market, days=60, secid=None):
     import akshare as ak
     try:
         if market == "a":
             df = ak.stock_zh_a_hist(symbol=code, period="daily", adjust="qfq").tail(days)
             cols = {"收盘": "close", "最高": "high", "最低": "low", "成交量": "volume"}
+            recs = df.rename(columns=cols).to_dict("records")
+            return [{k: to_float(r.get(k)) for k in ("close", "high", "low", "volume")}
+                    for r in recs]
         else:
             # ak.stock_us_hist 需要带 eastmoney 前缀的原始代码（如 "105.AAPL"），
             # 快照归一化后的 code 是裸 ticker，必须用 secid 兜底
             df = ak.stock_us_hist(symbol=(secid or code), period="daily",
                                   adjust="qfq").tail(days)
             cols = {"收盘": "close", "最高": "high", "最低": "low", "成交量": "volume"}
-        recs = df.rename(columns=cols).to_dict("records")
-        return [{k: to_float(r.get(k)) for k in ("close", "high", "low", "volume")}
-                for r in recs]
+            recs = df.rename(columns=cols).to_dict("records")
+            rows = [{k: to_float(r.get(k)) for k in ("close", "high", "low", "volume")}
+                    for r in recs]
+            if not rows:
+                return _us_klines_tencent(code, secid, days)
+            return rows
     except Exception:
+        if market == "us":
+            return _us_klines_tencent(code, secid, days)
         return []
