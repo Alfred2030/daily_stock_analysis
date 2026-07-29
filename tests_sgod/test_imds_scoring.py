@@ -38,3 +38,13 @@ def test_peer_median_comparison_adjusts_score():
     vs_weak = health_score(GOOD_PEER, GOOD_MGMT, GOOD_RISK, peer_median=weak_median)
     vs_none = health_score(GOOD_PEER, GOOD_MGMT, GOOD_RISK)
     assert vs_weak["score"] >= vs_none["score"]    # 显著优于同行 → 加分
+
+def test_missing_keys_do_not_crash():
+    """缺键不再KeyError——绝不抛错"""
+    # 完全空的字典：应返回None score和空flags
+    r = health_score({}, {}, {})
+    assert r["score"] is None and r["flags"] == []
+
+    # 只有1个指标：coverage不足（1/10 < 0.4）
+    r2 = health_score({"roe": 15.0}, {}, {})
+    assert r2["score"] is None and r2["coverage"] < 0.4
