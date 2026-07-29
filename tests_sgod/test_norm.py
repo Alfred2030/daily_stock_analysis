@@ -16,6 +16,7 @@ def test_normalize_a_share_row():
     assert r["code"] == "600519" and r["market"] == "a"
     assert r["pe"] == 22.5 and r["turnover_amt"] == 5.6e9
     assert r["listing_days"] is None  # 快照没有上市天数，后续补
+    assert r["secid"] == "600519"     # A股 secid = code
 
 def test_normalize_us_row_strips_prefix():
     row = {"代码": "105.AAPL", "名称": "苹果", "最新价": "228.1", "涨跌幅": "-0.4",
@@ -23,3 +24,4 @@ def test_normalize_us_row_strips_prefix():
     r = normalize_row(row, "us")
     assert r["code"] == "AAPL" and r["pe"] == 34.2
     assert r["pb"] is None  # 美股快照无市净率 → None 不臆造
+    assert r["secid"] == "105.AAPL"   # 美股 secid 保留原始 eastmoney 前缀代码，供 K 线接口用

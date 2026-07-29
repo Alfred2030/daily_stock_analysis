@@ -5,9 +5,9 @@ from datetime import date, timedelta
 
 CFG = load_sgod_config()
 
-def _fake_snapshot(market):
+def _fake_snapshot(market, n=40):
     rows = []
-    for i in range(40):
+    for i in range(n):
         rows.append({"code": f"6001{i:02d}", "name": f"股{i}", "market": "a",
                      "price": 10.0 + i, "pct_chg": 1.0, "turnover_amt": 5e8,
                      "volume_ratio": 1.2, "turnover_rate": 3.0, "pe": 10 + i,
@@ -18,7 +18,7 @@ def _fake_snapshot(market):
 def _fake_listing_days(codes):
     return {c: 500 for c in codes}
 
-def _fake_klines(code, market, days=60):
+def _fake_klines(code, market, days=60, secid=None):
     return [{"close": 10 + i * 0.05, "high": 10.3 + i * 0.05,
              "low": 9.8 + i * 0.05, "volume": 1e6} for i in range(60)]
 
@@ -43,3 +43,21 @@ def test_run_screener_end_to_end(tmp_path, monkeypatch):
     assert all(r["code"] != "600100" for r in top)      # 去重生效
     assert all("buy" in r and r["buy"] for r in top)     # 每只带买点
     assert all("score" in r for r in top)
+
+def test_dedup_before_top50_cut_allows_backfill(tmp_path, monkeypatch):
+    """I1: 去重必须先于 top-50 裁剪发生，否则历史里记多了会导致顺位递补失效。
+    池子放大到 80 只，把打分最高的前 35 只（全部落在旧逻辑的 top-50 短名单内）
+    提前记入历史；旧实现（先裁 50 再去重）短名单只剩 15 只，凑不满 top_n=20；
+    新实现（先去重再裁 50）会从 50 名开外递补，仍能凑满 top_n。"""
+    monkeypatch.setattr(srun, "fetch_snapshot", lambda market: _fake_snapshot(market, n=80))
+    monkeypatch.setattr(srun, "fetch_listing_days_a", _fake_listing_days)
+    monkeypatch.setattr(srun, "fetch_klines", _fake_klines)
+
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    excluded_codes = [f"6001{i:02d}" for i in range(35)]
+    h = RecommendHistory(tmp_path / "h_backfill.db")
+    h.record("a", excluded_codes, yesterday)
+
+    top = srun.run_screener("a", CFG, h)
+    assert len(top) == CFG["screener"]["top_n"]                  # 顺位递补：仍凑满 top_n
+    assert all(r["code"] not in excluded_codes for r in top)     # 去重代码确实没进结果

@@ -15,6 +15,8 @@ def run_screener(market, cfg, history, top_n=None):
     kept = hard_filter(rows, market, cfg)
     scored = [score_row(r, cfg) for r in kept]
     scored.sort(key=lambda r: r["score"], reverse=True)
+    exclude = history.recent_codes(market, cfg["screener"]["dedup_days"])
+    scored = [r for r in scored if r["code"] not in exclude]  # 先去重，保证顺位递补再裁剪
     short = scored[:50]                                   # 短名单再精查
     if market == "a":
         days_map = fetch_listing_days_a([r["code"] for r in short])
@@ -22,12 +24,11 @@ def run_screener(market, cfg, history, top_n=None):
             r["listing_days"] = days_map.get(r["code"])
         short = hard_filter(short, market, cfg)           # 二次过滤(补齐天数后)
         short = [score_row(r, cfg) for r in short]
-    exclude = history.recent_codes(market, cfg["screener"]["dedup_days"])
     if top_n:
         cfg = {**cfg, "screener": {**cfg["screener"], "top_n": top_n}}
-    top = rank_top(short, cfg, exclude_codes=exclude)
+    top = rank_top(short, cfg, exclude_codes=exclude)      # 双重保险，无害
     for r in top:
-        r["buy"] = buy_zone(fetch_klines(r["code"], market), r["price"])
+        r["buy"] = buy_zone(fetch_klines(r["code"], market, secid=r.get("secid")), r["price"])
     return top
 
 def main():

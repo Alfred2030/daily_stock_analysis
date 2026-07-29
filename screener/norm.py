@@ -37,10 +37,12 @@ def _pick(row: dict, key: str):
     return None
 
 def normalize_row(row: dict, market: str) -> dict:
-    code = str(_pick(row, "code") or "").strip()
-    if market == "us" and "." in code:
-        code = code.split(".", 1)[1].upper()
-    out = {"code": code, "name": _pick(row, "name"), "market": market,
+    raw_code = str(_pick(row, "code") or "").strip()
+    code = raw_code
+    secid = raw_code                    # 原始行情代码（美股含 105./106. 前缀），供 K 线接口用
+    if market == "us" and "." in raw_code:
+        code = raw_code.split(".", 1)[1].upper()
+    out = {"code": code, "secid": secid, "name": _pick(row, "name"), "market": market,
            "listing_days": None}
     for k in ("price", "pct_chg", "turnover_amt", "volume_ratio",
               "turnover_rate", "pe", "pb", "total_mv", "circ_mv", "pct_60d"):

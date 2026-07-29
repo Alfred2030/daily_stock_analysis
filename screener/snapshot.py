@@ -46,14 +46,17 @@ def fetch_listing_days_a(codes):
         time.sleep(0.3)             # 限流保护
     return out
 
-def fetch_klines(code, market, days=60):
+def fetch_klines(code, market, days=60, secid=None):
     import akshare as ak
     try:
         if market == "a":
             df = ak.stock_zh_a_hist(symbol=code, period="daily", adjust="qfq").tail(days)
             cols = {"收盘": "close", "最高": "high", "最低": "low", "成交量": "volume"}
         else:
-            df = ak.stock_us_hist(symbol=code, period="daily", adjust="qfq").tail(days)
+            # ak.stock_us_hist 需要带 eastmoney 前缀的原始代码（如 "105.AAPL"），
+            # 快照归一化后的 code 是裸 ticker，必须用 secid 兜底
+            df = ak.stock_us_hist(symbol=(secid or code), period="daily",
+                                  adjust="qfq").tail(days)
             cols = {"收盘": "close", "最高": "high", "最低": "low", "成交量": "volume"}
         recs = df.rename(columns=cols).to_dict("records")
         return [{k: to_float(r.get(k)) for k in ("close", "high", "low", "volume")}
