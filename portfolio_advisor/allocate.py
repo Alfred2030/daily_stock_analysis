@@ -5,6 +5,8 @@ def _rank_key(c):
     return c["score"] * ((h / 100) if h is not None else 0.8)
 
 def allocate(candidates, capital, profile, cfg) -> dict:
+    if capital is None or capital <= 0:
+        return {"picks": [], "cash_reserve": 0.0, "cash_pct": 100.0}
     prof = cfg["advisor"]["risk_profiles"][profile]
     max_pos = prof["max_pos"] * capital
     max_ind = prof["max_industry"] * capital
@@ -21,7 +23,7 @@ def allocate(candidates, capital, profile, cfg) -> dict:
         room = min(max_pos, invest_budget - used, max_ind - by_ind.get(ind, 0.0))
         if room <= 0:
             continue
-        if c["market"] == "a":
+        if c.get("market") == "a":
             lots = int(room // (c["price"] * 100))
             if lots < 1:
                 continue                      # 买不起一手 → 顺位递补

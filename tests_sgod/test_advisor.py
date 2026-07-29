@@ -50,3 +50,13 @@ def test_prompt_mentions_disclaimer_inputs():
     a = allocate(CANDS, 100000, "balanced", CFG)
     prompt = build_advisor_prompt(a, "a")
     assert "止损" in prompt and "风险" in prompt
+
+def test_zero_capital_returns_empty():
+    a = allocate(CANDS, 0, "balanced", CFG)
+    assert a["picks"] == [] and a["cash_pct"] == 100.0
+
+def test_us_market_fractional_amount():
+    us = [{**_cand("AAPL", 90, 228.0, "Technology"), "market": "us"}]
+    a = allocate(us, 100000, "balanced", CFG)
+    assert a["picks"] and a["picks"][0]["shares"] is None
+    assert a["picks"][0]["amount"] <= 15000 + 1
