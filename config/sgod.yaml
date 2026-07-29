@@ -1,0 +1,26 @@
+# config/sgod.yaml — 选股神器可调参数（改这里不用改代码）
+screener:
+  top_n: 20
+  dedup_days: 14
+  subnew_max_days: 250          # 上市≤250交易日 → 打"次新"标签
+  a:
+    min_listing_days: 20
+    min_turnover_amt: 100000000   # 1亿元
+    min_price: 2.0
+    exclude_loss: true            # PE<0 剔除；PE 缺失不剔除
+    name_blacklist: ["ST", "*ST", "退"]
+  us:
+    min_listing_days: 20
+    min_turnover_amt: 50000000    # $5000万
+    min_price: 2.0
+    exclude_loss: true
+    name_blacklist: ["ETF", "ETN", "基金", "信托", "优先股", "权证", "认股权",
+                      " WT", " RT", " PFD"]
+scoring:
+  weights: {finance: 0.4, technical: 0.3, flow: 0.3}
+advisor:
+  capital_base: 100000            # 默认本金，Web/.env 可覆盖
+  risk_profiles:
+    conservative: {max_pos: 0.10, max_industry: 0.30, min_cash: 0.50, n_picks: 3}
+    balanced:     {max_pos: 0.15, max_industry: 0.30, min_cash: 0.30, n_picks: 4}
+    aggressive:   {max_pos: 0.25, max_industry: 0.30, min_cash: 0.10, n_picks: 6}
