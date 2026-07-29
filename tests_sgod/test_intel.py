@@ -24,3 +24,9 @@ def test_no_search_key_returns_empty_news(monkeypatch):
     out = intel.gather_intel([{"code": "AAPL", "industry": "Technology"}], "us")
     assert out["Technology"]["news"] == []
     assert out["Technology"]["assessment"] is None
+
+def test_gather_intel_skips_codeless_candidates(monkeypatch):
+    monkeypatch.setattr(intel, "_search", lambda q: [])
+    monkeypatch.setattr(intel, "chat", lambda *a, **k: None)
+    out = intel.gather_intel([{"industry": "白酒"}, {"code": "600519", "industry": "白酒"}], "a")
+    assert out["白酒"]["stocks"] == ["600519"]

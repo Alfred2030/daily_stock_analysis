@@ -6,7 +6,8 @@ from sgod.llm import chat
 def build_queries(industry, market):
     if market == "a":
         return [f"{industry} 行业政策 最新", f"{industry} 产业数据 出口 贸易"]
-    return [f"{industry} 美联储 关税 政策 影响", f"{industry} CPI 监管 动态"]
+    return [f"{industry} sector Fed rates tariff policy impact",
+            f"{industry} 关税 美联储 政策影响"]
 
 def _search(query):
     key = os.getenv("TAVILY_API_KEY")
@@ -19,7 +20,7 @@ def _search(query):
                              timeout=30)
         resp.raise_for_status()
         return [r.get("title", "") for r in resp.json().get("results", []) if r.get("title")]
-    except requests.RequestException:
+    except Exception:
         return []
 
 def build_intel_prompt(industry, news, stocks):
@@ -33,7 +34,10 @@ def gather_intel(candidates, market):
     groups = {}
     for c in candidates:
         ind = c.get("industry") or "未知行业"
-        groups.setdefault(ind, []).append(c["code"])
+        code = c.get("code")
+        if not code:
+            continue
+        groups.setdefault(ind, []).append(code)
     out = {}
     for ind, codes in groups.items():
         news = []
