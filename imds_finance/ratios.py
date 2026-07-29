@@ -24,7 +24,7 @@ def _yoy(series, key):
     cur, prev = _sum_last(series, key, 4, 0), _sum_last(series, key, 4, 4)
     if cur is None or prev is None or prev == 0:
         return None
-    return round((cur / abs(prev) - 1) * 100, 1)
+    return round((cur - prev) / abs(prev) * 100, 1)
 
 def peer_card(series) -> dict:
     rev, gp, np_ = (_sum_last(series, k) for k in ("revenue", "gross_profit", "net_profit"))

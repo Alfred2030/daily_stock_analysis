@@ -36,3 +36,10 @@ def test_insufficient_data_returns_none_fields():
     assert c["gross_margin"] is None
     c2 = mgmt_card(SERIES[:5])                     # 不足8季无YoY
     assert c2["rev_yoy"] is None
+
+def test_yoy_loss_to_profit_turnaround_positive():
+    # 前4季净利均为-25(亏损100), 近4季净利均为+12.5(盈利50) → YoY = (50-(-100))/100*100 = +150%
+    series = [_q(f"T{i}", 100.0, -25.0) for i in range(4)] + \
+             [_q(f"T{i+4}", 100.0, 12.5) for i in range(4)]
+    c = mgmt_card(series)
+    assert c["profit_yoy"] == 150.0
