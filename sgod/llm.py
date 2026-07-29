@@ -6,12 +6,13 @@ def _post(url, headers, payload, timeout=90):
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
         if resp.status_code == 200:
-            return resp.json()
+            return ("ok", resp.json())
         if resp.status_code in (429, 500, 502, 503, 504):
-            return None
+            return ("retry", None)
         resp.raise_for_status()
     except requests.RequestException:
-        return None
+        return ("retry", None)
+    return ("fatal", None)
 
 def chat(prompt, system=None, max_tokens=2000, temperature=0.4):
     key = os.getenv("GLM_API_KEY")
@@ -26,11 +27,13 @@ def chat(prompt, system=None, max_tokens=2000, temperature=0.4):
                "max_tokens": max_tokens, "temperature": temperature}
     headers = {"Authorization": f"Bearer {key}"}
     for i in range(3):
-        data = _post(f"{base}/chat/completions", headers, payload)
-        if data:
+        kind, data = _post(f"{base}/chat/completions", headers, payload)
+        if kind == "ok":
             try:
                 return data["choices"][0]["message"]["content"]
-            except (KeyError, IndexError):
+            except (KeyError, IndexError, TypeError, AttributeError):
                 return None
+        if kind == "fatal":
+            return None
         time.sleep(retry_base * (2 ** i))
     return None

@@ -15,7 +15,21 @@ def test_build_prompt_contains_cards_and_asks_two_sections():
     assert "毛利率" in p          # 三卡数据进了提示词
 
 def test_chat_returns_none_on_failure(monkeypatch):
-    monkeypatch.setattr(llm, "_post", lambda *a, **k: None)
+    monkeypatch.setattr(llm, "_post", lambda *a, **k: ("retry", None))
+    monkeypatch.setenv("GLM_API_KEY", "k")
+    monkeypatch.setenv("SGOD_LLM_RETRY_BASE", "0")
+    assert llm.chat("hi") is None
+
+def test_chat_fatal_error_fails_fast(monkeypatch):
+    calls = []
+    monkeypatch.setattr(llm, "_post", lambda *a, **k: calls.append(1) or ("fatal", None))
+    monkeypatch.setenv("GLM_API_KEY", "k")
+    assert llm.chat("hi") is None
+    assert len(calls) == 1
+
+def test_chat_malformed_200_returns_none(monkeypatch):
+    monkeypatch.setattr(llm, "_post", lambda *a, **k: ("ok", {"choices": None}))
+    monkeypatch.setenv("GLM_API_KEY", "k")
     assert llm.chat("hi") is None
 
 def test_finance_report_degrades_without_llm(monkeypatch):
