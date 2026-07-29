@@ -12,10 +12,28 @@ from imds_finance.report import finance_report
 from industry_intel.run import gather_intel
 from portfolio_advisor.allocate import allocate
 from portfolio_advisor.report import advisor_report
-from sgod.wecom import build_daily_markdown, send_wecom, _truncate_bytes, _LIMIT
+from sgod.wecom import build_daily_markdown, send_wecom
 from sgod.html_report import write_html_report
 
 REPORT_DIR = Path(__file__).resolve().parent / "data" / "sgod" / "reports"
+
+def _resolve_capital(cfg):
+    default = float(cfg["advisor"]["capital_base"])
+    raw = os.getenv("SGOD_CAPITAL")
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        print(f"⚠ SGOD_CAPITAL 非法数值 {raw!r}，回退默认本金 {default}")
+        return default
+
+def _resolve_risk_profile(cfg):
+    raw = os.getenv("SGOD_RISK_PROFILE", "balanced")
+    if raw not in cfg["advisor"]["risk_profiles"]:
+        print(f"⚠ 未知风险偏好 {raw!r}，回退 balanced")
+        return "balanced"
+    return raw
 
 def _run_deep_pipeline(codes) -> bool:
     """子进程复用上游深度分析；失败不中断日报。"""
@@ -44,8 +62,8 @@ def run_session(market, cfg, limit=None, deep=True, notify=True, record=True,
         finance_map[r["code"]] = rep
         r["health_score"] = rep["health"]["score"]
     intel = gather_intel(top, market)
-    capital = float(os.getenv("SGOD_CAPITAL", cfg["advisor"]["capital_base"]))
-    profile = os.getenv("SGOD_RISK_PROFILE", "balanced")
+    capital = _resolve_capital(cfg)
+    profile = _resolve_risk_profile(cfg)
     alloc = allocate(top, capital, profile, cfg)
     advisor_text = advisor_report(alloc, market)
     day = date.today().isoformat()
@@ -57,14 +75,9 @@ def run_session(market, cfg, limit=None, deep=True, notify=True, record=True,
     if notify:
         web_url = os.getenv("SGOD_WEB_URL", "https://stock.cxodex.com") \
             + f"/daily/{html_path.name}"
+        prefix = "> ⚠ 深度分析流水线失败，本期缺少个股深度报告\n" if not deep_ok else ""
         md = build_daily_markdown(market, day, top, alloc, advisor_text,
-                                  intel, web_url)
-        if not deep_ok:
-            warn_line = "> ⚠ 深度分析流水线失败，本期缺少个股深度报告\n"
-            if len((warn_line + md).encode("utf-8")) <= _LIMIT:
-                md = warn_line + md
-            else:
-                md = _truncate_bytes(warn_line + md, _LIMIT)
+                                  intel, web_url, prefix=prefix)
         pushed = bool(send_wecom(md))
     if record:
         history.record(market, [r["code"] for r in top], day)

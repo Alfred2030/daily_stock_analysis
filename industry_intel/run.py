@@ -40,6 +40,10 @@ def gather_intel(candidates, market):
         groups.setdefault(ind, []).append(code)
     out = {}
     for ind, codes in groups.items():
+        if ind == "未知行业":
+            # 行业本身未知，搜索/研判都无的放矢，直接跳过，避免臆造评估
+            out[ind] = {"stocks": codes, "news": [], "assessment": None}
+            continue
         news = []
         for q in build_queries(ind, market):
             news.extend(_search(q))

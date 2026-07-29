@@ -69,6 +69,43 @@ def test_no_notify_still_records_history(tmp_path, monkeypatch):
     assert result["pushed"] is False
     assert "600519" in RecommendHistory(db_path).recent_codes("a", 14)
 
+def test_resolve_risk_profile_falls_back_to_balanced(monkeypatch, capsys):
+    monkeypatch.setenv("SGOD_RISK_PROFILE", "yolo")
+    assert run_daily._resolve_risk_profile(CFG) == "balanced"
+    assert "yolo" in capsys.readouterr().out
+
+def test_resolve_risk_profile_passes_through_known_value(monkeypatch):
+    monkeypatch.setenv("SGOD_RISK_PROFILE", "aggressive")
+    assert run_daily._resolve_risk_profile(CFG) == "aggressive"
+
+def test_resolve_capital_falls_back_on_bad_float(monkeypatch, capsys):
+    monkeypatch.setenv("SGOD_CAPITAL", "not-a-number")
+    assert run_daily._resolve_capital(CFG) == float(CFG["advisor"]["capital_base"])
+    assert "not-a-number" in capsys.readouterr().out
+
+def test_resolve_capital_uses_env_when_valid(monkeypatch):
+    monkeypatch.setenv("SGOD_CAPITAL", "250000")
+    assert run_daily._resolve_capital(CFG) == 250000.0
+
+def test_run_session_survives_bad_env(tmp_path, monkeypatch):
+    """未知风险偏好 + 非法本金不应让整场崩溃，而是告警回退默认值。"""
+    monkeypatch.setenv("SGOD_RISK_PROFILE", "yolo")
+    monkeypatch.setenv("SGOD_CAPITAL", "not-a-number")
+    monkeypatch.setattr(run_daily, "run_screener", lambda *a, **k: [dict(r) for r in TOP])
+    monkeypatch.setattr(run_daily, "_run_deep_pipeline", lambda codes: True)
+    monkeypatch.setattr(run_daily, "fetch_industry", lambda c, m: "白酒")
+    monkeypatch.setattr(run_daily, "fetch_series", lambda c, m: [])
+    monkeypatch.setattr(run_daily, "finance_report", lambda *a, **k:
+                        {"cards": {}, "health": {"score": 85.0, "coverage": 1.0,
+                         "flags": []}, "analysis_text": "分析", "outlook_text": "展望"})
+    monkeypatch.setattr(run_daily, "gather_intel", lambda cands, m: {})
+    monkeypatch.setattr(run_daily, "advisor_report", lambda *a, **k: "组合说明")
+    monkeypatch.setattr(run_daily, "send_wecom", lambda md: True)
+    monkeypatch.setattr(run_daily, "DB_PATH", tmp_path / "h.db")
+    result = run_daily.run_session("a", CFG, deep=True, notify=True,
+                                   out_dir=tmp_path / "reports")
+    assert result["top"][0]["health_score"] == 85.0     # 没崩，正常跑完
+
 def test_deep_failure_sets_flag_and_warns(tmp_path, monkeypatch):
     monkeypatch.setattr(run_daily, "run_screener", lambda *a, **k: [dict(r) for r in TOP])
     monkeypatch.setattr(run_daily, "_run_deep_pipeline", lambda codes: False)

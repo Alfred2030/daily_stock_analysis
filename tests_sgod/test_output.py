@@ -46,3 +46,30 @@ def test_markdown_last_resort_is_byte_safe():
     top = [{**TOP[0], "buy": {**TOP[0]["buy"], "trigger": "触发条件" * 500}}] * 5
     md = build_daily_markdown("a", "2026-07-29", top, None, None, {}, "https://x")
     assert len(md.encode("utf-8")) <= 4000
+
+def test_top5_shows_placeholder_when_buy_missing():
+    top = [{**TOP[0], "buy": {"buy_low": None, "buy_high": None,
+            "position_hint": "", "trigger": ""}}]
+    md = build_daily_markdown("a", "2026-07-29", top, None, None, {}, "https://x")
+    assert "买点暂缺" in md
+    assert "None~None" not in md
+
+def test_no_industry_section_when_no_assessment():
+    intel = {"白酒": {"stocks": ["600519"], "news": [], "assessment": None}}
+    md = build_daily_markdown("a", "2026-07-29", TOP, ALLOC, "组合说明", intel,
+                              "https://stock.cxodex.com")
+    assert "行业情报" not in md
+
+def test_prefix_survives_every_ladder_tier():
+    prefix = "> ⚠ 深度分析流水线失败，本期缺少个股深度报告\n"
+    md = build_daily_markdown("a", "2026-07-29", TOP, ALLOC, "组合说明",
+                              INTEL, "https://stock.cxodex.com", prefix=prefix)
+    assert md.startswith(prefix)
+    # 逼近最后一档（连策略/情报都被砍掉）时，前缀仍要在
+    huge_top = TOP * 5
+    md2 = build_daily_markdown("a", "2026-07-29", huge_top, ALLOC, "说明" * 100,
+                               {f"行业{i}": {"stocks": ["600519"], "news": ["x" * 50] * 8,
+                                "assessment": "中性：" + "很长的评估" * 30} for i in range(20)},
+                               "https://stock.cxodex.com", prefix=prefix)
+    assert md2.startswith(prefix)
+    assert len(md2.encode("utf-8")) <= 4000

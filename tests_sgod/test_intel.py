@@ -30,3 +30,14 @@ def test_gather_intel_skips_codeless_candidates(monkeypatch):
     monkeypatch.setattr(intel, "chat", lambda *a, **k: None)
     out = intel.gather_intel([{"industry": "白酒"}, {"code": "600519", "industry": "白酒"}], "a")
     assert out["白酒"]["stocks"] == ["600519"]
+
+def test_unknown_industry_skips_search_and_assessment(monkeypatch):
+    search_calls = []
+    chat_calls = []
+    monkeypatch.setattr(intel, "_search", lambda q: search_calls.append(q) or ["新闻标题"])
+    monkeypatch.setattr(intel, "chat", lambda *a, **k: chat_calls.append(1) or "利好：不该被调用")
+    out = intel.gather_intel([{"code": "600000"}], "a")     # 无 industry → 未知行业
+    assert out["未知行业"]["stocks"] == ["600000"]
+    assert out["未知行业"]["news"] == []
+    assert out["未知行业"]["assessment"] is None
+    assert search_calls == [] and chat_calls == []
