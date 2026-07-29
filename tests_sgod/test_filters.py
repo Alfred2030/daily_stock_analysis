@@ -30,3 +30,14 @@ def test_us_filters_price_and_liquidity():
 def test_missing_fields_do_not_crash():
     kept = hard_filter([_row(pe=None, pct_60d=None)], "a", CFG)
     assert kept  # PE 缺失不按亏损处理，放行交给打分层
+
+def test_us_filters_out_non_common_stock_instruments():
+    rows = [
+        _row(market="us", code="AAPL", name="苹果", price=228.0, turnover_amt=8e9, pe=30.0),
+        _row(market="us", code="AAPL.U", name="苹果单位", price=228.0, turnover_amt=8e9, pe=30.0),
+        _row(market="us", code="AAPL_WS", name="苹果认股权证", price=228.0, turnover_amt=8e9, pe=30.0),
+        _row(market="us", code="SPY", name="SPDR ETF信托", price=228.0, turnover_amt=8e9, pe=30.0),
+        _row(market="us", code="XYZ", name="XYZ优先股", price=228.0, turnover_amt=8e9, pe=30.0),
+    ]
+    kept = hard_filter(rows, "us", CFG)
+    assert [r["code"] for r in kept] == ["AAPL"]

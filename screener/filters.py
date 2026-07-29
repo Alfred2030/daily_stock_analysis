@@ -17,6 +17,10 @@ def hard_filter(rows, market, cfg) -> list:
         name = str(r.get("name") or "")
         if any(b in name for b in mc["name_blacklist"]):
             continue
+        if market == "us":
+            code = str(r.get("code") or "")
+            if "." in code or "_" in code:      # 单位/权证等非普通股后缀
+                continue
         price = r.get("price")
         if price is None or price < mc["min_price"]:
             continue

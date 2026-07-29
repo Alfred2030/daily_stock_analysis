@@ -14,7 +14,8 @@ screener:
     min_turnover_amt: 50000000    # $5000万
     min_price: 2.0
     exclude_loss: true
-    name_blacklist: []
+    name_blacklist: ["ETF", "ETN", "基金", "信托", "优先股", "权证", "认股权",
+                      " WT", " RT", " PFD"]
 scoring:
   weights: {finance: 0.4, technical: 0.3, flow: 0.3}
 advisor:
