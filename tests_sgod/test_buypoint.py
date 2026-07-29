@@ -18,3 +18,14 @@ def test_overextended_price_suggests_wait():
     closes = [10.0] * 50 + [10.5, 11.5, 12.8, 14.2, 16.0]   # 短期暴涨乖离大
     z = buy_zone(_k(closes), 16.0)
     assert z["position_hint"] == "观望"
+
+def test_downtrend_zone_never_inverted():
+    closes = [30 - i * 0.9 for i in range(20)]      # 急跌
+    z = buy_zone(_k(closes), closes[-1])
+    assert z["buy_low"] <= z["buy_high"]
+    assert z["position_hint"] != "标准"
+
+def test_gap_down_zone_never_inverted():
+    closes = [20.0] * 55 + [14.0] * 5               # 跳空破位
+    z = buy_zone(_k(closes), 14.0)
+    assert z["buy_low"] <= z["buy_high"]

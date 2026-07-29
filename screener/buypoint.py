@@ -19,9 +19,12 @@ def buy_zone(klines, last_price):
     resistance = max(highs[-60:] if len(highs) >= 60 else highs)
     bias = (last_price / ma20 - 1) if ma20 else 0.0
     buy_high = min(ma5 or last_price, last_price * 1.01)
-    buy_low = max(support, ma20) if ma20 else support
+    buy_low = min(max(support, ma20), buy_high) if ma20 else support
+    zone_was_clamped = ma20 and ma20 > buy_high
     if bias > 0.08:
         hint, trigger = "观望", "乖离率过大，等回踩 MA20 缩量企稳再介入"
+    elif zone_was_clamped:
+        hint, trigger = "轻仓试探", "价格位于 MA20 之下，等企稳回升到均线上方再考虑"
     elif last_price <= buy_high:
         hint, trigger = "标准", "现价处于买入区间，回踩支撑缩量企稳可分批介入"
     else:
