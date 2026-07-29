@@ -9,6 +9,7 @@ _CSS = ("body{font-family:system-ui;max-width:1080px;margin:24px auto;padding:0 
         "th{background:#1a1d24}h1,h2{color:#e8c66a}.card{background:#1a1d24;"
         "border-radius:10px;padding:14px;margin:10px 0}.flag{color:#ff7a6b}"
         ".dis{color:#888;font-size:12px;margin-top:28px}")
+INDEX_KEEP = 60  # 每日2份(A股+美股)×30天
 
 def _esc(v):
     return _html.escape(str(v)) if v is not None else "—"
@@ -17,7 +18,7 @@ def _fin_block(code, fmap):
     f = (fmap or {}).get(code)
     if not f:
         return "<p>财务数据不足</p>"
-    h = f["health"]
+    h = f.get("health") or {}
     flags = "".join(f'<div class="flag">⚠ {_esc(x)}</div>' for x in h.get("flags", []))
     return (f'<p>财务健康分：<b>{_esc(h.get("score"))}</b>'
             f'（覆盖率 {_esc(h.get("coverage"))}）</p>{flags}'
@@ -33,7 +34,7 @@ def write_html_report(out_dir, market, day, top, finance_map, alloc,
     for r in top:
         b = r.get("buy") or {}
         rows += (f"<tr><td>{_esc(r['code'])}</td><td>{_esc(r['name'])}"
-                 f"{'（' + '/'.join(r['tags']) + '）' if r.get('tags') else ''}</td>"
+                 f"{'（' + _esc('/'.join(r['tags'])) + '）' if r.get('tags') else ''}</td>"
                  f"<td>{_esc(r['score'])}</td><td>{_esc(r.get('industry'))}</td>"
                  f"<td>{_esc(b.get('buy_low'))}~{_esc(b.get('buy_high'))}</td>"
                  f"<td>{_esc(b.get('position_hint'))}</td></tr>")
@@ -60,7 +61,7 @@ def write_html_report(out_dir, market, day, top, finance_map, alloc,
             f"<p class='dis'>{DISCLAIMER}</p>")
     path = out / f"{day}-{market}.html"
     path.write_text(page, encoding="utf-8")
-    items = sorted(out.glob("*-*.html"), reverse=True)[:60]
+    items = sorted(out.glob("*-*.html"), reverse=True)[:INDEX_KEEP]
     idx = "".join(f'<li><a href="{p.name}">{p.stem}</a></li>'
                   for p in items if p.name != "index.html")
     (out / "index.html").write_text(

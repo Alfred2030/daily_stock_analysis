@@ -35,3 +35,14 @@ def test_html_report_written_with_index(tmp_path):
     assert p.exists() and (tmp_path / "index.html").exists()
     html = p.read_text(encoding="utf-8")
     assert "贵州茅台" in html and "展望" in html and "不构成投资建议" in html
+
+def test_html_escapes_tags(tmp_path):
+    top = [{**TOP[0], "tags": ["<b>次新</b>"]}]
+    p = write_html_report(tmp_path, "a", "2026-07-29", top, {}, None, None, {})
+    html = p.read_text(encoding="utf-8")
+    assert "<b>次新</b>" not in html and "&lt;b&gt;次新&lt;/b&gt;" in html
+
+def test_markdown_last_resort_is_byte_safe():
+    top = [{**TOP[0], "buy": {**TOP[0]["buy"], "trigger": "触发条件" * 500}}] * 5
+    md = build_daily_markdown("a", "2026-07-29", top, None, None, {}, "https://x")
+    assert len(md.encode("utf-8")) <= 4000

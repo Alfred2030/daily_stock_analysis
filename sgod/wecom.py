@@ -5,6 +5,10 @@ import requests
 DISCLAIMER = "本报告由 AI 生成，仅供研究参考，不构成投资建议，据此操作风险自负"
 _LIMIT = 4000
 
+def _truncate_bytes(s: str, limit: int) -> str:
+    b = s.encode("utf-8")[:limit]
+    return b.decode("utf-8", errors="ignore")
+
 def _top5_lines(top):
     lines = []
     for r in top[:5]:
@@ -37,7 +41,7 @@ def build_daily_markdown(market, day, top, alloc, advisor_text, intel, web_url):
         md = "".join(parts) + tail
         if len(md.encode("utf-8")) <= _LIMIT:
             return md
-    return (head + tail)[: _LIMIT]
+    return _truncate_bytes(head + tail, _LIMIT)
 
 def send_wecom(markdown: str) -> bool:
     url = os.getenv("SGOD_WECOM_WEBHOOK")
