@@ -7,27 +7,33 @@ def test_fetch_snapshot_direct_paginates_and_normalizes(monkeypatch):
     page1 = [{"f12": f"6001{i:02d}", "f13": 0, "f14": f"股{i}", "f2": 10.0 + i,
               "f3": 1.0, "f6": 5e8, "f8": 3.0, "f9": 10 + i, "f10": 1.2,
               "f23": 1.5, "f20": 3e10, "f21": 3e10, "f24": 5.0}
-             for i in range(20)]
+             for i in range(100)]
     page2 = [{"f12": f"6002{i:02d}", "f13": 0, "f14": f"股b{i}", "f2": 20.0 + i,
               "f3": 1.0, "f6": 5e8, "f8": 3.0, "f9": 12 + i, "f10": 1.2,
               "f23": 1.5, "f20": 3e10, "f21": 3e10, "f24": 5.0}
-             for i in range(5)]
+             for i in range(100)]
+    page3 = [{"f12": f"6003{i:02d}", "f13": 0, "f14": f"股c{i}", "f2": 30.0 + i,
+              "f3": 1.0, "f6": 5e8, "f8": 3.0, "f9": 14 + i, "f10": 1.2,
+              "f23": 1.5, "f20": 3e10, "f21": 3e10, "f24": 5.0}
+             for i in range(50)]
 
     calls = []
 
-    def fake_clist_page(market, pn, pz=1000):
+    def fake_clist_page(market, pn, pz=100):
         calls.append(pn)
         if pn == 1:
-            return 25, page1
+            return 250, page1
         elif pn == 2:
-            return 25, page2
-        return 25, []
+            return 250, page2
+        elif pn == 3:
+            return 250, page3
+        return 250, []
 
     monkeypatch.setattr(snap, "_clist_page", fake_clist_page)
     monkeypatch.setattr(snap.time, "sleep", lambda s: None)
 
     rows = _fetch_snapshot_direct("a")
-    assert len(rows) == 25
+    assert len(rows) == 250
     first = rows[0]
     assert first["code"] == "600100"
     assert first["price"] == 10.0
@@ -39,7 +45,7 @@ def test_fetch_snapshot_direct_us_row_maps_secid_and_pe(monkeypatch):
            "f6": 1e9, "f8": 1.0, "f9": None, "f10": 1.0, "f23": 40.0,
            "f20": 3e12, "f21": 3e12, "f24": 10.0, "f115": 30.5}
 
-    def fake_clist_page(market, pn, pz=1000):
+    def fake_clist_page(market, pn, pz=100):
         if pn == 1:
             return 1, [row]
         return 1, []
@@ -67,7 +73,7 @@ def test_fetch_snapshot_falls_back_to_direct_on_akshare_failure(monkeypatch):
            "f6": 5e8, "f8": 3.0, "f9": 10, "f10": 1.2, "f23": 1.5,
            "f20": 3e10, "f21": 3e10, "f24": 5.0}
 
-    def fake_clist_page(market, pn, pz=1000):
+    def fake_clist_page(market, pn, pz=100):
         if pn == 1:
             return 1, [row]
         return 1, []
@@ -87,7 +93,7 @@ def test_fetch_snapshot_raises_when_both_fail(monkeypatch):
     monkeypatch.setitem(__import__("sys").modules, "akshare", FakeAk())
     monkeypatch.setattr(snap.time, "sleep", lambda s: None)
 
-    def fake_clist_page(market, pn, pz=1000):
+    def fake_clist_page(market, pn, pz=100):
         raise RuntimeError("network down")
 
     monkeypatch.setattr(snap, "_clist_page", fake_clist_page)

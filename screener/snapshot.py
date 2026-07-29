@@ -1,4 +1,6 @@
 # screener/snapshot.py
+# 注：clist fallback 使用 push2delay 行情源（延迟 15 分钟）。
+# 收盘后的日间批处理不受影响；单页硬上限 100 条，分页循环最多 150 页。
 from __future__ import annotations
 import time
 from .norm import normalize_row, to_float
@@ -16,12 +18,12 @@ def _retry(fn, tries=3, base=2.0):
             time.sleep(base * (2 ** i))
     raise SnapshotError(str(last))
 
-_CLIST_URL = "https://push2.eastmoney.com/api/qt/clist/get"
+_CLIST_URL = "https://push2delay.eastmoney.com/api/qt/clist/get"
 _CLIST_FIELDS = "f2,f3,f6,f8,f9,f10,f12,f13,f14,f20,f21,f23,f24,f115"
 _FS = {"a": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23", "us": "m:105,m:106,m:107"}
 _UT = "bd1d9ddb04089700cf9c27f6f7426281"
 
-def _clist_page(market, pn, pz=1000):
+def _clist_page(market, pn, pz=100):
     """单页原始行；网络失败抛异常由调用方处理。"""
     import requests
     r = requests.get(_CLIST_URL, params={
@@ -52,13 +54,13 @@ def _fetch_snapshot_direct(market):
     total, first = _clist_page(market, 1)
     rows = list(first)
     pn = 2
-    while len(rows) < total and pn <= 30:
+    while len(rows) < total and pn <= 150:
         t, page = _clist_page(market, pn)
         if not page:
             break
         rows.extend(page)
         pn += 1
-        time.sleep(0.5)
+        time.sleep(0.3)
     if not rows:
         raise SnapshotError("clist直连无数据")
     return [normalize_row(r, market) for r in _clist_rows_to_cn(rows, market)]
