@@ -94,7 +94,7 @@ venv/bin/python run_daily.py --market us --limit 3 --dry-run --no-deep
 
 ```bash
 cd /opt/stock-analysis
-pm2 start "venv/bin/python main.py --webui-only --port 3024" --name stock
+pm2 start venv/bin/python --name stock --interpreter none -- main.py --webui-only --port 3024
 pm2 save
 ```
 
