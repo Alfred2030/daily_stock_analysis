@@ -1,6 +1,7 @@
 import screener.run as srun
 from screener.filters import load_sgod_config
 from screener.history import RecommendHistory
+from datetime import date, timedelta
 
 CFG = load_sgod_config()
 
@@ -25,10 +26,20 @@ def test_run_screener_end_to_end(tmp_path, monkeypatch):
     monkeypatch.setattr(srun, "fetch_snapshot", _fake_snapshot)
     monkeypatch.setattr(srun, "fetch_listing_days_a", _fake_listing_days)
     monkeypatch.setattr(srun, "fetch_klines", _fake_klines)
+
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+    # Positive control: 600100 (PE=10, best) ranks in top_n when no history
+    h_empty = RecommendHistory(tmp_path / "h_empty.db")
+    top_without_dedup = srun.run_screener("a", CFG, h_empty)
+    assert any(r["code"] == "600100" for r in top_without_dedup), \
+        "600100 (best PE) should rank in top 20 without dedup history"
+
+    # Main assertion: dedup excludes 600100 when recorded in history
     h = RecommendHistory(tmp_path / "h.db")
-    h.record("a", ["600139"], "2026-07-28")  # 最高分之一提前进历史
+    h.record("a", ["600100"], yesterday)  # 最高分代码提前进历史
     top = srun.run_screener("a", CFG, h)
     assert len(top) == CFG["screener"]["top_n"]
-    assert all(r["code"] != "600139" for r in top)      # 去重生效
+    assert all(r["code"] != "600100" for r in top)      # 去重生效
     assert all("buy" in r and r["buy"] for r in top)     # 每只带买点
     assert all("score" in r for r in top)
