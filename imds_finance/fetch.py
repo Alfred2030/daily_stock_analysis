@@ -69,7 +69,7 @@ def _us_series(code, quarters=8):
                 if syn in getattr(f, "index", []) and col in f.columns:
                     return to_float(f.at[syn, col])
         return None
-    return [{"period": str(getattr(c, "date", c)),
+    return [{"period": str(c.date()) if callable(getattr(c, "date", None)) else str(c),
              **{k: _val(k, c) for k in _FIELDS}} for c in cols]
 
 def fetch_series(code, market, quarters=8):
@@ -84,7 +84,8 @@ def fetch_industry(code, market):
             import akshare as ak
             info = ak.stock_individual_info_em(symbol=code)
             kv = dict(zip(info["item"], info["value"]))
-            return str(kv.get("行业")) or None
+            ind = kv.get("行业")
+            return str(ind) if ind else None
         import yfinance as yf
         return yf.Ticker(code).info.get("sector")
     except Exception:

@@ -36,3 +36,21 @@ def test_us_series_maps_yf_frames(monkeypatch):
     assert series[-1]["total_assets"] == 1000.0
     assert series[-1]["op_cashflow"] == 12.0
     assert series[0]["total_assets"] is None       # 早期季度资产表缺 → None
+
+def test_us_series_period_is_date_string(monkeypatch):
+    fin = pd.DataFrame({pd.Timestamp("2026-03-31"): {"Total Revenue": 100.0}})
+    monkeypatch.setattr(ff, "_yf_frames", lambda code: (fin, pd.DataFrame(), pd.DataFrame()))
+    series = ff._us_series("AAPL", quarters=8)
+    assert series[-1]["period"] == "2026-03-31"
+
+def test_fetch_industry_missing_returns_none(monkeypatch):
+    # 模拟 akshare 模块及其函数，返回不含"行业"键的DataFrame
+    class MockAkshare:
+        @staticmethod
+        def stock_individual_info_em(symbol):
+            return pd.DataFrame({"item": ["名称"], "value": ["某股"]})
+
+    import sys
+    monkeypatch.setitem(sys.modules, "akshare", MockAkshare())
+    result = ff.fetch_industry("600519", "a")
+    assert result is None
