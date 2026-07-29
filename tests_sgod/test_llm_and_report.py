@@ -32,6 +32,19 @@ def test_chat_malformed_200_returns_none(monkeypatch):
     monkeypatch.setenv("GLM_API_KEY", "k")
     assert llm.chat("hi") is None
 
+def test_post_classifies_status(monkeypatch):
+    class R:
+        def __init__(self, sc, body=None): self.status_code = sc; self._b = body
+        def json(self):
+            if self._b is None: raise ValueError("not json")
+            return self._b
+    monkeypatch.setattr(llm.requests, "post", lambda *a, **k: R(401))
+    assert llm._post("u", {}, {})[0] == "fatal"
+    monkeypatch.setattr(llm.requests, "post", lambda *a, **k: R(429))
+    assert llm._post("u", {}, {})[0] == "retry"
+    monkeypatch.setattr(llm.requests, "post", lambda *a, **k: R(200, {"x": 1}))
+    assert llm._post("u", {}, {}) == ("ok", {"x": 1})
+
 def test_finance_report_degrades_without_llm(monkeypatch):
     import imds_finance.report as rep
     monkeypatch.setattr(rep, "chat", lambda *a, **k: None)

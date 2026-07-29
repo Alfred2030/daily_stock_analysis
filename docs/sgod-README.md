@@ -173,13 +173,13 @@ write_html_report → 自包含 HTML 日报（Top表格 + 策略表 + 行业情�
 
 ## 6. 已知限制
 
-1. **美股无同行中位数**：`imds_finance/fetch.py::fetch_peer_median()` 在 `market != "a"` 时直接返回 `None`，不臆造同行数据；美股财务健康分不会有"同行加减分"环节，仅基于自身财报打分。
+1. **同行加减分首版对 A股与美股均不生效**：`imds_finance/fetch.py::fetch_peer_median()` 目前仅提供 PE/PB 中位数（毛利率/ROE 中位数需逐股拉全行业财报，成本过高，故硬编码为 `None`）；美股（`market != "a"`）则直接返回 `None`，不臆造同行数据。而 `scoring.py::health_score()` 的加减分环节只依据 `gross_margin`/`roe` 两个字段对比同行中位数，这两个字段在 A股与美股场景下均取不到值，因此该环节实际处于预留状态，两个市场都不会触发"同行加减分"，健康分仅基于自身财报打分。
 2. **东财快照限流与超时降级语义**：
    - 全市场快照 `fetch_snapshot()` 用 `_retry()` 包裹 akshare 的 `stock_zh_a_spot_em`/`stock_us_spot_em`，失败时按 2s/4s/8s 指数退避重试 3 次；仍失败会抛出 `screener.snapshot.SnapshotError`，**中断当次场次**（不是优雅降级，而是整场失败）。
    - `run_daily.py` 顶层 `try/except` 会捕获该异常并尝试企业微信告警（未配置 webhook 则静默失败），随后 `raise SystemExit(1)`——**`SystemExit` 不打印原始异常堆栈**，终端表现为"无任何输出、退出码 1"，这是设计使然，不代表脚本本身有 bug。要看到具体的异常信息，请改用 `python -m screener.run --market <a|us> --dry-run --top N` 直接调用（该命令不捕获异常，会打印完整堆栈）。
    - `fetch_listing_days_a()` 对短名单逐只补上市天数时加了 0.3s 限流保护，单只失败记 `None`，不阻塞其余候选。
    - `fetch_klines`/`fetch_series`/`fetch_industry`/`fetch_peer_median` 均对单只候选的异常做了静默捕获（返回 `[]`/`None`），不会因单只股票的数据源问题拖垮整批。
-3. **LLM 失败降级不臆造**：`sgod/llm.py::chat()` 无 `GLM_API_KEY` 直接返回 `None`；HTTP 429/500/502/503/504 会重试 3 次（指数退避，基数 `SGOD_LLM_RETRY_BASE`）后仍失败返回 `None`；其他 HTTP 错误判定为 `fatal`，立即返回 `None`；响应结构异常（缺字段/类型不对）同样返回 `None`。所有依赖 GLM 的文本（财务分析/展望、行业情报判断、策略建议说明）在失败时均为 `None`，HTML/推送侧会展示"暂缺"而不是编造内容。
+3. **LLM 失败降级不臆造**：`sgod/llm.py::chat()` 无 `GLM_API_KEY` 直接返回 `None`；429/5xx 与网络错误重试 3 次指数退避（基数 `SGOD_LLM_RETRY_BASE`）；其余 4xx（如 Key 无效）立即放弃不重试；最终失败返回 `None` 降级为「AI 分析暂缺」。响应结构异常（缺字段/类型不对，或 200 但非 JSON）同样返回 `None`。所有依赖 GLM 的文本（财务分析/展望、行业情报判断、策略建议说明）在失败时均为 `None`，HTML/推送侧会展示"暂缺"而不是编造内容。
 4. **非交易日快照自然为空/或被过滤**：akshare 全市场接口返回的是最近一个交易日快照；若当天尚无成交数据，`turnover_amt` 等字段可能缺失，从而被 `hard_filter` 的成交额门槛剔除，导致该场次候选数偏少甚至为 0——这是预期行为，不是 bug。
 5. **本机冒烟网络状况记录（如实记录，2026-07-29）**：本机对东方财富行情接口（`82.push2.eastmoney.com` / `72.push2.eastmoney.com`）访问不稳定，A股与美股两个场次的 `python -m screener.run` 冒烟均以 `screener.snapshot.SnapshotError: HTTPSConnectionPool(host=..., port=443): Read timed out. (read timeout=15)` 失败，重试一次后仍失败（与 Task 6 阶段记录的"本机东财接口超时"现象一致）。因快照阶段即失败，本次未能产出 `data/sgod/reports/` 下的 HTML 日报，故未能现场核验报告页面渲染；HTML 生成逻辑本身（Top 表格 + 财务卡 + 免责声明）已在 `sgod/html_report.py` 源码走查中确认覆盖第 1 节列出的全部字段。生产/CI 环境若网络可达 eastmoney，预期能正常产出报告；若长期不可达，可考虑腾讯行情源等替代快照数据源作为后续增强项（不在本任务范围内）。
 

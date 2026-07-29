@@ -5,14 +5,16 @@ import requests
 def _post(url, headers, payload, timeout=90):
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
-        if resp.status_code == 200:
-            return ("ok", resp.json())
-        if resp.status_code in (429, 500, 502, 503, 504):
-            return ("retry", None)
-        resp.raise_for_status()
     except requests.RequestException:
+        return ("retry", None)          # 网络层错误可重试
+    if resp.status_code == 200:
+        try:
+            return ("ok", resp.json())
+        except ValueError:
+            return ("retry", None)      # 200但非JSON，视作瞬时异常
+    if resp.status_code in (429, 500, 502, 503, 504):
         return ("retry", None)
-    return ("fatal", None)
+    return ("fatal", None)              # 4xx等不可重试
 
 def chat(prompt, system=None, max_tokens=2000, temperature=0.4):
     key = os.getenv("GLM_API_KEY")
