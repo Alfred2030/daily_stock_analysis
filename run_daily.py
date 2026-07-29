@@ -101,6 +101,9 @@ def main():
                              notify=not (args.dry_run or args.no_notify),
                              record=not args.dry_run)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"场次失败：{e}")
         send_wecom(f"⚠ 选股神器 {args.market} 场次失败：{e}")
         raise SystemExit(1)
     print(f"完成：Top{len(result['top'])}，日报 {result['html_path']}，"
