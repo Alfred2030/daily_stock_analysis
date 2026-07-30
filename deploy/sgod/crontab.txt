@@ -1,7 +1,8 @@
-# 服务器为 UTC 时区（腾讯云 HK 默认）——北京时间 = UTC+8
-# A股场次：北京时间周一至五 17:30 → UTC 09:30
-30 9 * * 1-5 cd /opt/stock-analysis && /opt/stock-analysis/venv/bin/python run_daily.py --market a >> logs/sgod-a.log 2>&1
-# 美股场次：北京时间周二至六 07:30 → UTC 前一日 23:30（周一至五）
-30 23 * * 1-5 cd /opt/stock-analysis && /opt/stock-analysis/venv/bin/python run_daily.py --market us >> logs/sgod-us.log 2>&1
+# 服务器时区实测为 Asia/Shanghai (CST, UTC+8)——2026-07-30 部署时踩坑修正：
+# 勿按 UTC 换算！以下时间即北京时间。
+# A股场次：周一至五 17:30（收盘后）
+30 17 * * 1-5 cd /opt/stock-analysis && /opt/stock-analysis/venv/bin/python run_daily.py --market a >> logs/sgod-a.log 2>&1
+# 美股场次：周二至六 07:30（美股收盘后次晨）
+30 7 * * 2-6 cd /opt/stock-analysis && /opt/stock-analysis/venv/bin/python run_daily.py --market us >> logs/sgod-us.log 2>&1
 # 非交易日：run_daily 内部不做日历判断，依赖上游 --force-run 语义；
 # 快照为空/节假日接口无数据时当日自然产出空报告——首版接受，观察一周后再决定是否加交易日历
