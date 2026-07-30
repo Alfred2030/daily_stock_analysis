@@ -4,6 +4,11 @@ import argparse, os, subprocess, sys
 from datetime import date
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# cron/裸进程不会继承 .env——必须显式加载，否则 GLM/企业微信等全部静默降级
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 from screener.run import run_screener, DB_PATH
 from screener.filters import load_sgod_config
 from screener.history import RecommendHistory
